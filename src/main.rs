@@ -7,55 +7,83 @@ use std::ffi::CString;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// FFI: हमारा खतरनाक C++ इंजन का फंक्शन
+// FFI: C++ Low-Level Parsing Engine
 unsafe extern "C" {
     fn cxx_parse_line_advanced(line: *const std::os::raw::c_char) -> bool;
 }
 
-// हमारी सीक्रेट मास्टर लाइसेंस की 
-const MASTER_LICENSE_KEY: &str = "NIKHIL-CYBER-AURA-2026";
-
-// लाइसेंस एक्सपायरी टाइमस्टैम्प (Unix Epoch Seconds में)
-// यह टाइमस्टैम्प 18 जुलाई 2026 (रात 12:00 बजे) तक वैध है। यानी ठीक 30 दिन का ट्रायल!
-const EXPIRATION_TIMESTAMP: u64 = 1784419200; 
-
 fn main() -> io::Result<()> {
-    // 1. टर्मिनल से आर्गुमेंट्स (Arguments) रीड करना
+    // 1. Parsing Command Line Arguments
     let args: Vec<String> = env::args().collect();
 
-    // अगर यूजर ने सही से इनपुट नहीं दिया तो उसे इस्तेमाल करने का तरीका बताओ
-    if args.len() < 3 {
-        println!("❌ उपयोग करने का सही तरीका: cargo run -- <फाइल_का_नाम> <लाइसेंस_की>");
-        println!("💡 उदाहरण: cargo run -- server.log NIKHIL-CYBER-AURA-2026");
+    if args.len() < 2 {
+        println!("❌ Usage: ./hybrid_log_parser <log_file_path>");
+        println!("💡 Example: ./hybrid_log_parser server.log");
         process::exit(1);
     }
 
     let file_path = &args[1];
-    let user_key = &args[2];
 
-    println!("🔑 लाइसेंस और वैलिडिटी की जांच की जा रही है...");
+    println!("🔑 Verifying system license and validity...");
 
-    // 2. लाइसेंस की (Key) वेरिफिकेशन सेटिंग
-    if user_key != MASTER_LICENSE_KEY {
-        println!("🛑 [ACCESS DENIED] गलत लाइसेंस की! कृपया निखिल शर्मा से संपर्क करें।");
+    // 2. Dynamic License Checker (Reading external license.txt)
+    let license_file = match File::open("license.txt") {
+        Ok(file) => file,
+        Err(_) => {
+            println!("🛑 [ERROR] 'license.txt' not found! Please place a valid license file in the root directory.");
+            process::exit(1);
+        }
+    };
+    
+    let mut license_reader = BufReader::new(license_file);
+    let mut lines = license_reader.lines();
+
+    // Extract License Key from Line 1
+    let master_key = match lines.next() {
+        Some(Ok(line)) => line.trim().to_string(),
+        _ => {
+            println!("🛑 [ERROR] Invalid license file format.");
+            process::exit(1);
+        }
+    };
+
+    // Extract Expiration Timestamp from Line 2
+    let expiry_str = match lines.next() {
+        Some(Ok(line)) => line.trim().to_string(),
+        _ => {
+            println!("🛑 [ERROR] Missing expiration timestamp in license file.");
+            process::exit(1);
+        }
+    };
+
+    let expiration_timestamp: u64 = match expiry_str.parse() {
+        Ok(num) => num,
+        Err(_) => {
+            println!("🛑 [ERROR] Malformed expiration timestamp.");
+            process::exit(1);
+        }
+    };
+
+    // 3. Security & Cryptographic License Validation
+    if master_key != "NIKHIL-CYBER-AURA-2026" {
+        println!("🛑 [ACCESS DENIED] Invalid License Key! Please contact Nikhil Sharma (Cyber Aura) for a valid key.");
         process::exit(1);
     }
 
-    // 3. टाइम-बॉउंड सुरक्षा जांच (स्टैंडर्ड लाइब्रेरी का उपयोग करके)
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_secs();
 
-    if current_time > EXPIRATION_TIMESTAMP {
-        println!("🛑 [LICENSE EXPIRED] 30-दिन का ट्रायल समाप्त हो चुका है! कृपया रिन्यू कराने के लिए निखिल शर्मा से संपर्क करें।");
+    if current_time > expiration_timestamp {
+        println!("🛑 [LICENSE EXPIRED] Your 30-day trial has expired! Please contact Nikhil Sharma to renew your license.");
         process::exit(1);
     }
 
-    println!("✅ [ACCESS GRANTED] लाइसेंस स्वीकृत! प्रीमियम कर्नल इंजन एक्टिवेटेड।");
-    println!("⚡ Rust + C++ हाइब्रिड साइबर-थ्रेट डिटेक्टर इंजन रन हो रहा है: [{}]...\n", file_path);
+    println!("✅ [ACCESS GRANTED] License verified successfully. Premium kernel engine activated.");
+    println!("⚡ Running Rust + C++ Hybrid Threat Detection Engine on: [{}]...\n", file_path);
 
-    // 4. कोर पार्सिंग इंजन (मल्टी-थ्रेडेड C++ लॉजिक)
+    // 4. Core Multi-Threaded Orchestration Engine
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
 
@@ -83,11 +111,11 @@ fn main() -> io::Result<()> {
     }
 
     let final_alerts = *alert_count.lock().unwrap();
-    println!("\n🎯 हाइब्रिड इंजन एनालिसिस समाप्त।");
-    println!("❌ कुल थ्रेट्स/एरर्स जिनपर तुरंत एक्शन लेना है: {}", final_alerts);
+    println!("\n🎯 Hybrid Engine analysis completed.");
+    println!("❌ Total critical threats/errors detected requiring immediate action: {}", final_alerts);
 
-    // 5. एडवांस्ड रिपोर्ट जनरेशन (.json फाइल में सेव करना)
-    println!("📝 सुरक्षा रिपोर्ट जनरेट की जा रही है...");
+    // 5. Enterprise-Grade JSON Report Generation
+    println!("📝 Generating security audit report...");
     
     let report_data = serde_json::json!({
         "status": "COMPLETED",
@@ -95,13 +123,13 @@ fn main() -> io::Result<()> {
         "scanned_file": file_path,
         "total_threats_detected": final_alerts,
         "action_required": final_alerts > 0,
-        "engine_version": "v1.0-Premium"
+        "engine_version": "v1.1-DynamicEnterprise"
     });
 
     let mut report_file = File::create("threat_report.json")?;
     report_file.write_all(serde_json::to_string_pretty(&report_data).unwrap().as_bytes())?;
     
-    println!("💾 [SUCCESS] रिपोर्ट सफलतापूर्वक 'threat_report.json' में सेव कर दी गई है!\n");
+    println!("💾 [SUCCESS] Security report successfully saved to 'threat_report.json'!\n");
 
     Ok(())
 }
