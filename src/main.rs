@@ -1,3 +1,6 @@
+#[path = "active_shield.rs"]
+mod active_shield;
+
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
@@ -16,13 +19,34 @@ fn main() -> io::Result<()> {
     // 1. Parsing Command Line Arguments
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        println!("❌ Usage: ./hybrid_log_parser <log_file_path>");
-        println!("💡 Example: ./hybrid_log_parser server.log");
+    // अब टूल को चलाने के लिए <mode> और <file_path> दोनों देने होंगे
+    if args.len() < 3 {
+        println!("❌ Usage: ./hybrid_log_parser <mode> <log_file_path>");
+        println!("💡 Mode options:");
+        println!("   'scan'   -> For static multi-threaded analysis (Old Masterpiece)");
+        println!("   'shield' -> For real-time kernel sniffer & firewall defense (New Plan)");
+        println!("💡 Example: ./hybrid_log_parser shield server.log");
         process::exit(1);
     }
 
-    let file_path = &args[1];
+    let mode = &args[1];
+    let file_path = &args[2];
+
+    // ⚡ न्यू प्लान: अगर यूजर 'shield' मोड चुनता है, तो सीधे एक्टिव शील्ड शुरू कर दो
+    if mode == "shield" {
+        if let Err(e) = active_shield::start_realtime_shield(file_path) {
+            println!("❌ Active Shield Error: {:?}", e);
+        }
+        return Ok(());
+    }
+
+    // -------------------------------------------------------------------------
+    // पुराना मास्टरपीस: 'scan' मोड का पुराना कोड वैसा का वैसा ही रहेगा नीचे
+    // -------------------------------------------------------------------------
+    if mode != "scan" {
+        println!("❌ Unknown mode: '{}'. Use 'scan' or 'shield'.", mode);
+        process::exit(1);
+    }
 
     println!("🔑 Verifying system license and validity...");
 
@@ -159,7 +183,7 @@ fn main() -> io::Result<()> {
         "scanned_file": file_path,
         "total_threats_detected": final_alerts,
         "action_required": final_alerts > 0,
-        "engine_version": "v1.1-DynamicEnterprise"
+        "engine_version": "v1.2-DynamicEnterprise"
     });
 
     let mut report_file = File::create("threat_report.json")?;
