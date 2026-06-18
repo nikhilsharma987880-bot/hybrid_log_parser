@@ -83,24 +83,60 @@ fn main() -> io::Result<()> {
     println!("✅ [ACCESS GRANTED] License verified successfully. Premium kernel engine activated.");
     println!("⚡ Running Rust + C++ Hybrid Threat Detection Engine on: [{}]...\n", file_path);
 
-    // 4. Core Multi-Threaded Orchestration Engine
+    // 4. Core Optimized Multi-Threaded Engine (Chunking lines instead of spawning 900k threads)
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
 
     let alert_count = Arc::new(Mutex::new(0));
     let mut handles = vec![];
+    
+    // We will collect 10,000 lines into a chunk before spawning a thread
+    let mut chunk = Vec::new();
 
     for line in reader.lines() {
         let line = line?;
-        let alert_count_clone = Arc::clone(&alert_count);
-        let c_line = CString::new(line).unwrap();
+        chunk.push(line);
 
-        let handle = thread::spawn(move || {
-            unsafe {
-                if cxx_parse_line_advanced(c_line.as_ptr()) {
-                    let mut num = alert_count_clone.lock().unwrap();
-                    *num += 1;
+        // Once the chunk reaches 10,000 lines, delegate it to a worker thread
+        if chunk.len() >= 10000 {
+            let alert_count_clone = Arc::clone(&alert_count);
+            let current_chunk = std::mem::take(&mut chunk);
+
+            let handle = thread::spawn(move || {
+                let mut local_alerts = 0;
+                for item in current_chunk {
+                    let c_line = CString::new(item).unwrap();
+                    unsafe {
+                        if cxx_parse_line_advanced(c_line.as_ptr()) {
+                            local_alerts += 1;
+                        }
+                    }
                 }
+                if local_alerts > 0 {
+                    let mut num = alert_count_clone.lock().unwrap();
+                    *num += local_alerts;
+                }
+            });
+            handles.push(handle);
+        }
+    }
+
+    // Process the remaining lines in the final leftover chunk
+    if !chunk.is_empty() {
+        let alert_count_clone = Arc::clone(&alert_count);
+        let handle = thread::spawn(move || {
+            let mut local_alerts = 0;
+            for item in chunk {
+                let c_line = CString::new(item).unwrap();
+                unsafe {
+                    if cxx_parse_line_advanced(c_line.as_ptr()) {
+                        local_alerts += 1;
+                    }
+                }
+            }
+            if local_alerts > 0 {
+                let mut num = alert_count_clone.lock().unwrap();
+                *num += local_alerts;
             }
         });
         handles.push(handle);
