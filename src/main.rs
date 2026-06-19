@@ -37,7 +37,7 @@ fn main() -> io::Result<()> {
         start_aura_ota_engine();
     }
 
-    // ⚡ न्यू प्लान: अगर यूजर 'shield' मोड चुनता है, तो सीधे एक्टिव शील्ड शुरू कर दो
+    // ⚡ न्यू充ान: अगर यूजर 'shield' मोड चुनता है, तो सीधे एक्टिव शील्ड शुरू कर दो
     if mode == "shield" {
         if let Err(e) = active_shield::start_realtime_shield(file_path) {
             println!("❌ Active Shield Error: {:?}", e);
