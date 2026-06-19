@@ -11,7 +11,7 @@ unsafe extern "C" {
     fn cxx_parse_line_advanced(line: *const std::os::raw::c_char) -> bool;
 }
 
-// एडवांस फ़ायरवॉल ब्लॉकिंग फ़ंक्शन (क्लीन आईपी के साथ)
+// एडवांस फ़ायरवॉल ब्लॉकिंग फ़ंक्शन (एब्सोल्यूट पाथ और क्लीन आईपी के साथ)
 fn block_ip_via_firewall(line: &str) {
     if let Some(ip) = line.split_whitespace().next() {
         // 🔥 प्रो-लेवल आईपी क्लीनअप: ब्रैकेट, कोट्स या कचरा कैरेक्टर को हटाना
@@ -19,9 +19,8 @@ fn block_ip_via_firewall(line: &str) {
         
         println!("🛡️ [AURA SHIELD] Threat detected from IP: {}. Triggering Firewall...", clean_ip);
         
-        // 🚀 एंटरप्राइज फिक्स: कंपनी सर्वर्स पर सीधे 'ufw' या 'iptables' कॉल होता है, 
-        // टूल को बैकग्राउंड में प्रिविलेज दी जाती है (नीचे तरीका बताया है)
-        let status = Command::new("ufw")
+        // 🚀 फिक्स: /usr/sbin/ufw का पूरा पाथ इस्तेमाल कर रहे हैं ताकि बिना sudo पाथ एरर न आए
+        let status = Command::new("/usr/sbin/ufw")
             .arg("deny")
             .arg("from")
             .arg(clean_ip)
@@ -30,10 +29,10 @@ fn block_ip_via_firewall(line: &str) {
         match status {
             Ok(output) => {
                 if output.status.success() {
-                    println!("🚫 [BANNED] IP {} has been successfully blocked at the kernel level!", clean_ip);
+                    println!("🚫 [BANNED] IP {} has been successfully blocked via UFW!", clean_ip);
                 } else {
-                    // अगर ufw नहीं है, तो iptables बैकअप ट्राई करेगा
-                    let iptables_status = Command::new("iptables")
+                    // बैकअप: /sbin/iptables का पूरा पाथ
+                    let iptables_status = Command::new("/sbin/iptables")
                         .arg("-A")
                         .arg("INPUT")
                         .arg("-s")
@@ -48,10 +47,25 @@ fn block_ip_via_firewall(line: &str) {
                             return;
                         }
                     }
-                    println!("⚠️ [WARNING] Firewall rejected the command. Privilege elevation needed.");
+                    println!("⚠️ [WARNING] Firewall binaries found but execution rejected. Check permissions.");
                 }
             }
-            Err(_) => println!("❌ [ERROR] Could not execute firewall binary setup."),
+            Err(_) => {
+                // अगर पाथ अलग है, तो नॉर्मल ufw ट्राई करो (Fallback)
+                let fallback = Command::new("ufw")
+                    .arg("deny")
+                    .arg("from")
+                    .arg(clean_ip)
+                    .output();
+                    
+                if let Ok(f_out) = fallback {
+                    if f_out.status.success() {
+                        println!("🚫 [BANNED] IP {} blocked via fallback UFW!", clean_ip);
+                        return;
+                    }
+                }
+                println!("❌ [ERROR] Could not locate or execute firewall binaries on this system path.");
+            }
         }
     }
 }
