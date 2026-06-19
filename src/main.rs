@@ -10,8 +10,9 @@ use std::ffi::CString;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// FFI: C++ Low-Level Parsing Engine
+// FFI: C++ Low-Level Parsing & Dynamic Rules Engine Links (Fully Updated with OTA)
 unsafe extern "C" {
+    fn start_aura_ota_engine(); 
     fn cxx_parse_line_advanced(line: *const std::os::raw::c_char) -> bool;
 }
 
@@ -19,7 +20,6 @@ fn main() -> io::Result<()> {
     // 1. Parsing Command Line Arguments
     let args: Vec<String> = env::args().collect();
 
-    // अब टूल को चलाने के लिए <mode> और <file_path> दोनों देने होंगे
     if args.len() < 3 {
         println!("❌ Usage: ./hybrid_log_parser <mode> <log_file_path>");
         println!("💡 Mode options:");
@@ -32,6 +32,11 @@ fn main() -> io::Result<()> {
     let mode = &args[1];
     let file_path = &args[2];
 
+    // ⚡ टूल एक्टिव होते ही बैकग्राउंड क्लाउड सिंक इंजन और लोकल रूल्स को फायर करेगा
+    unsafe {
+        start_aura_ota_engine();
+    }
+
     // ⚡ न्यू प्लान: अगर यूजर 'shield' मोड चुनता है, तो सीधे एक्टिव शील्ड शुरू कर दो
     if mode == "shield" {
         if let Err(e) = active_shield::start_realtime_shield(file_path) {
@@ -40,9 +45,6 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
-    // -------------------------------------------------------------------------
-    // पुराना मास्टरपीस: 'scan' मोड का पुराना कोड वैसा का वैसा ही रहेगा नीचे
-    // -------------------------------------------------------------------------
     if mode != "scan" {
         println!("❌ Unknown mode: '{}'. Use 'scan' or 'shield'.", mode);
         process::exit(1);
@@ -50,11 +52,11 @@ fn main() -> io::Result<()> {
 
     println!("🔑 Verifying system license and validity...");
 
-    // 2. Dynamic License Checker (Reading external license.txt)
+    // 2. Dynamic License Checker
     let license_file = match File::open("license.txt") {
         Ok(file) => file,
         Err(_) => {
-            println!("🛑 [ERROR] 'license.txt' not found! Please place a valid license file in the root directory.");
+            println!("🛑 [ERROR] 'license.txt' not found! Please place a valid license file.");
             process::exit(1);
         }
     };
@@ -62,7 +64,6 @@ fn main() -> io::Result<()> {
     let mut license_reader = BufReader::new(license_file);
     let mut lines = license_reader.lines();
 
-    // Extract License Key from Line 1
     let master_key = match lines.next() {
         Some(Ok(line)) => line.trim().to_string(),
         _ => {
@@ -71,7 +72,6 @@ fn main() -> io::Result<()> {
         }
     };
 
-    // Extract Expiration Timestamp from Line 2
     let expiry_str = match lines.next() {
         Some(Ok(line)) => line.trim().to_string(),
         _ => {
@@ -90,7 +90,7 @@ fn main() -> io::Result<()> {
 
     // 3. Security & Cryptographic License Validation
     if master_key != "NIKHIL-CYBER-AURA-2026" {
-        println!("🛑 [ACCESS DENIED] Invalid License Key! Please contact Nikhil Sharma (Cyber Aura) for a valid key.");
+        println!("🛑 [ACCESS DENIED] Invalid License Key! Please contact Nikhil Sharma (Cyber Aura).");
         process::exit(1);
     }
 
@@ -100,28 +100,25 @@ fn main() -> io::Result<()> {
         .as_secs();
 
     if current_time > expiration_timestamp {
-        println!("🛑 [LICENSE EXPIRED] Your 30-day trial has expired! Please contact Nikhil Sharma to renew your license.");
+        println!("🛑 [LICENSE EXPIRED] Your license has expired! Please contact Nikhil Sharma.");
         process::exit(1);
     }
 
     println!("✅ [ACCESS GRANTED] License verified successfully. Premium kernel engine activated.");
     println!("⚡ Running Rust + C++ Hybrid Threat Detection Engine on: [{}]...\n", file_path);
 
-    // 4. Core Optimized Multi-Threaded Engine (Chunking lines instead of spawning 900k threads)
+    // 4. Core Optimized Multi-Threaded Engine (Chunks of 10,000 lines)
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
 
     let alert_count = Arc::new(Mutex::new(0));
     let mut handles = vec![];
-    
-    // We will collect 10,000 lines into a chunk before spawning a thread
     let mut chunk = Vec::new();
 
     for line in reader.lines() {
         let line = line?;
         chunk.push(line);
 
-        // Once the chunk reaches 10,000 lines, delegate it to a worker thread
         if chunk.len() >= 10000 {
             let alert_count_clone = Arc::clone(&alert_count);
             let current_chunk = std::mem::take(&mut chunk);
@@ -145,7 +142,6 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // Process the remaining lines in the final leftover chunk
     if !chunk.is_empty() {
         let alert_count_clone = Arc::clone(&alert_count);
         let handle = thread::spawn(move || {
