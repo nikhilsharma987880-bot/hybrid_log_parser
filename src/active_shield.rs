@@ -4,107 +4,65 @@ use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::sync::mpsc::channel;
 use std::path::Path;
 use std::ffi::CString;
-use std::process::Command;
 
-// FFI: C++ Low-Level AI Engine
+// FFI: C++ Low-Level AI Engine Links (AURA Kernel Core)
 unsafe extern "C" {
     fn cxx_parse_line_advanced(line: *const std::os::raw::c_char) -> bool;
-}
-
-// एडवांस फ़ायरवॉल ब्लॉकिंग फ़ंक्शन (एब्सोल्यूट पाथ और क्लीन आईपी के साथ)
-fn block_ip_via_firewall(line: &str) {
-    if let Some(ip) = line.split_whitespace().next() {
-        // 🔥 प्रो-लेवल आईपी क्लीनअप: ब्रैकेट, कोट्स या कचरा कैरेक्टर को हटाना
-        let clean_ip = ip.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != ':');
-        
-        println!("🛡️ [AURA SHIELD] Threat detected from IP: {}. Triggering Firewall...", clean_ip);
-        
-        // 🚀 फिक्स: /usr/sbin/ufw का पूरा पाथ इस्तेमाल कर रहे हैं ताकि बिना sudo पाथ एरर न आए
-        let status = Command::new("/usr/sbin/ufw")
-            .arg("deny")
-            .arg("from")
-            .arg(clean_ip)
-            .output();
-
-        match status {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("🚫 [BANNED] IP {} has been successfully blocked via UFW!", clean_ip);
-                } else {
-                    // बैकअप: /sbin/iptables का पूरा पाथ
-                    let iptables_status = Command::new("/sbin/iptables")
-                        .arg("-A")
-                        .arg("INPUT")
-                        .arg("-s")
-                        .arg(clean_ip)
-                        .arg("-j")
-                        .arg("DROP")
-                        .output();
-
-                    if let Ok(ip_out) = iptables_status {
-                        if ip_out.status.success() {
-                            println!("🚫 [BANNED via iptables] IP {} successfully blocked!", clean_ip);
-                            return;
-                        }
-                    }
-                    println!("⚠️ [WARNING] Firewall binaries found but execution rejected. Check permissions.");
-                }
-            }
-            Err(_) => {
-                // अगर पाथ अलग है, तो नॉर्मल ufw ट्राई करो (Fallback)
-                let fallback = Command::new("ufw")
-                    .arg("deny")
-                    .arg("from")
-                    .arg(clean_ip)
-                    .output();
-                    
-                if let Ok(f_out) = fallback {
-                    if f_out.status.success() {
-                        println!("🚫 [BANNED] IP {} blocked via fallback UFW!", clean_ip);
-                        return;
-                    }
-                }
-                println!("❌ [ERROR] Could not locate or execute firewall binaries on this system path.");
-            }
-        }
-    }
 }
 
 pub fn start_realtime_shield(file_path: &str) -> Result<()> {
     println!("🔥 AURA Active Shield: Initializing Live Kernel Sniffer...");
     println!("👀 Watching log file: [{}] for real-time cyber attacks...\n", file_path);
 
+    // इनोटिफाई (FS Event) चैनल सेटअप
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(tx)?;
     watcher.watch(Path::new(file_path), RecursiveMode::NonRecursive)?;
 
-    let mut file = File::open(file_path)?;
-    let mut pos = file.seek(SeekFrom::End(0))?;
+    // फाइल के अंत (EOF) में पोजीशन सेट करना ताकि पुराना डेटा दोबारा प्रोसेस न हो
+    let mut file = File::open(file_path).map_err(|e| notify::Error::io(e))?;
+    let mut pos = file.seek(SeekFrom::End(0)).map_err(|e| notify::Error::io(e))?;
     let mut reader = BufReader::new(file);
 
+    // जैसे ही फाइल में कोई नया बदलाव (Modify) होगा, यह लूप ट्रिगर होगा
     for res in rx {
         match res {
             Ok(Event { kind, .. }) if kind.is_modify() => {
-                let mut file = File::open(file_path)?;
-                file.seek(SeekFrom::Start(pos))?;
+                let mut file = File::open(file_path).map_err(|e| notify::Error::io(e))?;
+                file.seek(SeekFrom::Start(pos)).map_err(|e| notify::Error::io(e))?;
                 reader = BufReader::new(file);
 
                 let mut line = String::new();
-                while reader.read_line(&mut line)? > 0 {
+                while reader.read_line(&mut line).map_err(|e| notify::Error::io(e))? > 0 {
                     let trimmed_line = line.trim();
                     if !trimmed_line.is_empty() {
-                        let c_line = CString::new(trimmed_line).unwrap();
                         
-                        unsafe {
-                            if cxx_parse_line_advanced(c_line.as_ptr()) {
-                                block_ip_via_firewall(trimmed_line);
+                        // ─── नया एडवांस सेफ्टी चेक ───
+                        // अगर लाइन FILE_MONITOR से शुरू हो रही है, तो यह केवल लोकल फाइल सिस्टम अलर्ट है
+                        if trimmed_line.starts_with("FILE_MONITOR") {
+                            println!("\n📂 [AURA MONITOR] System file event detected. Monitoring Integrity...");
+                            // सीधे C++ इंजन को पास करो, पर कोई भी लोकल डुप्लिकेट फायरवॉल एक्शन यहाँ से मत लो
+                            let c_line = CString::new(trimmed_line).unwrap();
+                            unsafe {
+                                cxx_parse_line_advanced(c_line.as_ptr());
                             }
+                            line.clear();
+                            continue;
+                        }
+
+                        // नॉर्मल लॉग लाइन्स (IP वाली) को सीधे C++ कोर हीूरिस्टिक लेयर पर भेजें
+                        let c_line = CString::new(trimmed_line).unwrap();
+                        unsafe {
+                            // C++ फ़ंक्शन खुद नेटफ़िल्टर/iptables को रूट प्रिविलेज के साथ हैंडल कर लेगा
+                            cxx_parse_line_advanced(c_line.as_ptr());
                         }
                     }
                     line.clear();
                 }
-                let mut f = File::open(file_path)?;
-                pos = f.seek(SeekFrom::End(0))?;
+                
+                // नया पोजीशन सेव करें ताकि अगले इवेंट पर सिर्फ नया डेटा रीड हो
+                let mut f = File::open(file_path).map_err(|e| notify::Error::io(e))?;
+                pos = f.seek(SeekFrom::End(0)).map_err(|e| notify::Error::io(e))?;
             }
             _ => {}
         }

@@ -1,8 +1,8 @@
 {
-  "action_required": false,
+  "action_required": true,
   "developer_credit": "Nikhil Sharma (Cyber Aura)",
   "engine_version": "v1.2-DynamicEnterprise",
-  "scanned_file": "big_server.log",
+  "scanned_file": "server.log",
   "status": "COMPLETED",
-  "total_threats_detected": 0
+  "total_threats_detected": 25
 }

@@ -39,7 +39,7 @@ extern "C" {
 
         std::cout << "🛡️ [AURA SHIELD] Activating firewall block for IP: " << ip << "...\n";
 
-        // सिस्टम से खुद iptables का सही पाTH ढूंढना
+        // सिस्टम से खुद iptables का सही पाथ ढूंढना
         std::string iptables_path = "/usr/sbin/iptables"; // Default Fallback
         FILE* pipe = popen("which iptables", "r");
         if (pipe) {
@@ -127,7 +127,7 @@ extern "C" {
         std::cout << "[🚀 AURA CLOUD] Remote OTA Update Sync Agent Activated in Background.\n";
     }
 
-    // 6. AI Heuristic Engine
+    // 6. AI Heuristic + Mutation + Dynamic Rules Parser Engine (Fully Integrated & Fixed)
     bool cxx_parse_line_advanced(const char* line_ptr) {
         if (!line_ptr) return false;
         std::string_view line(line_ptr);
@@ -136,6 +136,9 @@ extern "C" {
         if (ip_end == std::string_view::npos) return false;
         std::string ip_str(line.substr(0, ip_end));
 
+        // ─── नया सेफ्टी चेक: अगर IP में नंबर न हो (जैसे FILE_MONITOR), तो फायरवॉल ब्लॉक स्किप करो ───
+        bool is_valid_ip = (ip_str.find_first_of("0123456789") != std::string::npos);
+
         // LAYER 0: DYNAMIC RULES CHECK
         for (const auto& [pattern, action] : inbound_rules) {
             if (line.find(pattern) != std::string::npos) {
@@ -143,8 +146,8 @@ extern "C" {
                           << "\" -> Action Required: " << action << "\n"
                           << "[🚨 SHIELD ACTION] Threat Vector Isolated via Rules Engine!\n";
                 
-                // अगर एक्शन फ़ायरवॉल ट्रिगर करने का है, तो सीधे यहीं से ब्लॉक करो
-                if (action.find("FIREWALL") != std::string::npos || action.find("KILL_PROCESS") != std::string::npos) {
+                // सिर्फ वैलिड IP होने पर ही फायरवॉल ब्लॉक ट्रिगर करो
+                if (is_valid_ip && (action.find("FIREWALL") != std::string::npos || action.find("KILL_PROCESS") != std::string::npos || action.find("BLOCK") != std::string::npos)) {
                     aura_execute_firewall_block(ip_str.c_str());
                 }
                 return true; 
@@ -193,7 +196,10 @@ extern "C" {
         if (is_attack) {
             std::cout << "\n🧠 [AURA AI ALERT] " << attack_type << "\n"
                       << "[🚨 SHIELD ACTION] IP: " << ip_str << " -> संदेहास्पद गतिविधि रोकी गई!\n";
-            aura_execute_firewall_block(ip_str.c_str());
+            
+            if (is_valid_ip) {
+                aura_execute_firewall_block(ip_str.c_str());
+            }
             return true;
         }
 

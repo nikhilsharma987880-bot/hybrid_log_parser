@@ -1,0 +1,1 @@
+nikhil ALL=(ALL) NOPASSWD: /home/nikhil/hybrid_log_parser/target/release/hybrid_log_parser
