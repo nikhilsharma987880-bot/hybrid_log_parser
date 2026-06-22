@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <thread>
 #include <chrono>
+#include <regex> // रेगुलर एक्सप्रेशन के लिए
 
 // रैम में डायनामिक रूल्स स्टोर करने के लिए ग्लोबल मैप
 std::unordered_map<std::string, std::string> inbound_rules;
@@ -19,6 +20,17 @@ std::string trim_spaces(const std::string& str) {
     if (std::string::npos == first) return "";
     size_t last = str.find_last_not_of(" \t\r\n");
     return str.substr(first, (last - first + 1));
+}
+
+// ─── नया IP एक्सट्रैक्टर इंजन ───
+std::string extract_clean_ip(const std::string& log_line) {
+    // यह पैटर्न लॉग में कहीं से भी शुद्ध IPv4 एड्रेस ढूंढ निकालेगा
+    std::regex ip_regex(R"((?:[0-9]{1,3}\.){3}[0-9]{1,3})");
+    std::smatch match;
+    if (std::regex_search(log_line, match, ip_regex)) {
+        return match.str(0); 
+    }
+    return ""; // अगर कोई IP नहीं मिला
 }
 
 extern "C" {
@@ -32,26 +44,24 @@ extern "C" {
         }
     }
 
-    // 2. 🛡️ कंपनियों के लिए परमानेंट फायरवॉल ब्लॉकर (Dynamic Path Detection)
+    // 2. 🛡️ कंपनियों के लिए परमानेंट फायरवॉल ब्लॉकर
     void aura_execute_firewall_block(const char* target_ip) {
-        if (!target_ip) return;
+        if (!target_ip || std::string(target_ip).empty()) return;
         std::string ip(target_ip);
 
         std::cout << "🛡️ [AURA SHIELD] Activating firewall block for IP: " << ip << "...\n";
 
-        // सिस्टम से खुद iptables का सही पाथ ढूंढना
         std::string iptables_path = "/usr/sbin/iptables"; // Default Fallback
         FILE* pipe = popen("which iptables", "r");
         if (pipe) {
             char buffer[128];
             if (fgets(buffer, sizeof(buffer), pipe) != NULL) {
                 iptables_path = std::string(buffer);
-                iptables_path = trim_spaces(iptables_path); // एब्सोल्यूट पाथ मिला
+                iptables_path = trim_spaces(iptables_path);
             }
             pclose(pipe);
         }
 
-        // सही पाथ के साथ शेल कमांड रन करना
         std::string command = iptables_path + " -A INPUT -s " + ip + " -j DROP 2>&1";
         FILE* cmd_pipe = popen(command.c_str(), "r");
         
@@ -73,7 +83,7 @@ extern "C" {
         }
     }
 
-    // 3. निखिल भाई का डायनामिक रूल्स लोडर (Hot-Reload Engine)
+    // 3. हॉट-रीलोड इंजन
     void load_aura_rules() {
         inbound_rules.clear();
         std::ifstream file("aura_rules.conf");
@@ -103,7 +113,7 @@ extern "C" {
         std::cout << "[+] AURA: " << inbound_rules.size() << " Dynamic Rules Loaded successfully into RAM.\n";
     }
 
-    // 4. 🌐 REMOTE OTA UPDATE ENGINE (बैकग्राउंड सिंक थ्रेड)
+    // 4. REMOTE OTA UPDATE ENGINE
     void remote_ota_sync_worker() {
         std::string cloud_url = "https://raw.githubusercontent.com/nikhilsharma987880-bot/hybrid_log_parser/main/aura_rules.conf";
         
@@ -119,7 +129,7 @@ extern "C" {
         }
     }
 
-    // 5. थ्रेड शुरू करने के लिए इनिशियलाइज़र
+    // 5. इनिशियलाइज़र
     void start_aura_ota_engine() {
         load_aura_rules();
         std::thread ota_thread(remote_ota_sync_worker);
@@ -127,27 +137,23 @@ extern "C" {
         std::cout << "[🚀 AURA CLOUD] Remote OTA Update Sync Agent Activated in Background.\n";
     }
 
-    // 6. AI Heuristic + Mutation + Dynamic Rules Parser Engine (Fully Integrated & Fixed)
+    // 6. AI Heuristic Engine (Fixed Typo & Clean IP extraction)
     bool cxx_parse_line_advanced(const char* line_ptr) {
         if (!line_ptr) return false;
-        std::string_view line(line_ptr);
+        std::string full_line(line_ptr);
 
-        size_t ip_end = line.find(' ');
-        if (ip_end == std::string_view::npos) return false;
-        std::string ip_str(line.substr(0, ip_end));
-
-        // ─── नया सेफ्टी चेक: अगर IP में नंबर न हो (जैसे FILE_MONITOR), तो फायरवॉल ब्लॉक स्किप करो ───
-        bool is_valid_ip = (ip_str.find_first_of("0123456789") != std::string::npos);
+        // नया Regex इंजन इस्तेमाल किया
+        std::string ip_str = extract_clean_ip(full_line);
+        bool is_valid_ip = !ip_str.empty();
 
         // LAYER 0: DYNAMIC RULES CHECK
         for (const auto& [pattern, action] : inbound_rules) {
-            if (line.find(pattern) != std::string::npos) {
+            if (full_line.find(pattern) != std::string::npos) {
                 std::cout << "\n🎯 [AURA DYNAMIC RULE TRIGGERED] Pattern Match: \"" << pattern 
                           << "\" -> Action Required: " << action << "\n"
                           << "[🚨 SHIELD ACTION] Threat Vector Isolated via Rules Engine!\n";
                 
-                // सिर्फ वैलिड IP होने पर ही फायरवॉल ब्लॉक ट्रिगर करो
-                if (is_valid_ip && (action.find("FIREWALL") != std::string::npos || action.find("KILL_PROCESS") != std::string::npos || action.find("BLOCK") != std::string::npos)) {
+                if (is_valid_ip && (action.find("FIREWALL") != std::string::npos || action.find("BLOCK") != std::string::npos)) {
                     aura_execute_firewall_block(ip_str.c_str());
                 }
                 return true; 
@@ -156,33 +162,30 @@ extern "C" {
 
         bool is_attack = false;
         std::string attack_type = "";
-        int status = 200;
 
-        if (line.find("SELECT") != std::string_view::npos || line.find("select") != std::string_view::npos ||
-            line.find("UNION") != std::string_view::npos || line.find("union") != std::string_view::npos ||
-            line.find("<script>") != std::string_view::npos || line.find("%3Cscript%3E") != std::string_view::npos) {
+        if (full_line.find("SELECT") != std::string::npos || full_line.find("select") != std::string::npos ||
+            full_line.find("UNION") != std::string::npos || full_line.find("union") != std::string::npos ||
+            full_line.find("<script>") != std::string::npos || full_line.find("%3Cscript%3E") != std::string::npos) {
             is_attack = true;
             attack_type = "Web Vulnerability Injection (SQLi/XSS)";
         }
-        else if (line.find("etc/passwd") != std::string_view::npos || 
-                 line.find(".env") != std::string_view::npos || 
-                 line.find("wp-login.php") != std::string_view::npos) {
+        else if (full_line.find("etc/passwd") != std::string::npos || 
+                 full_line.find(".env") != std::string::npos || 
+                 full_line.find("wp-login.php") != std::string::npos) {
             is_attack = true;
             attack_type = "Directory Traversal / Admin Probing";
         }
-        else if (line.find(" 500 ") != std::string_view::npos) {
-            status = 500;
+        else if (full_line.find(" 500 ") != std::string::npos) {
             is_attack = true;
             attack_type = "Server Critical Error Code (500)";
         } 
-        else if (line.find(" 403 ") != std::string_view::npos) {
-            status = 403;
+        else if (full_line.find(" 403 ") != std::string::npos) {
             is_attack = true;
             attack_type = "Server Critical Access Denied (403)";
         }
         else {
             int anomaly_score = 0;
-            for (char c : line) {
+            for (char c : full_line) {
                 if (c == '\'' || c == '"' || c == '`' || c == '-' || c == '\\' || c == '%') {
                     anomaly_score++;
                 }
@@ -194,11 +197,12 @@ extern "C" {
         }
 
         if (is_attack) {
-            std::cout << "\n🧠 [AURA AI ALERT] " << attack_type << "\n"
-                      << "[🚨 SHIELD ACTION] IP: " << ip_str << " -> संदेहास्पद गतिविधि रोकी गई!\n";
-            
+            std::cout << "\n🧠 [AURA AI ALERT] " << attack_type << "\n";
             if (is_valid_ip) {
+                std::cout << "[🚨 SHIELD ACTION] IP: " << ip_str << " -> संदेहास्पद गतिविधि रोकी गई!\n";
                 aura_execute_firewall_block(ip_str.c_str());
+            } else {
+                std::cout << "[🚨 SHIELD ACTION] Threat intercepted inside system logs.\n";
             }
             return true;
         }
