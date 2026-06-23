@@ -1,5 +1,19 @@
 # ⚡ Hybrid Cyber-Threat Detector Engine (v1.0-Premium)
+## 🗺️ Project Roadmap: The Evolution of Cyber Aura
 
+Cyber Aura is evolving from a local endpoint protector into a *Global Autonomous Security Grid*.
+
+- [x] *Phase 1: Core EDR (eBPF + ChaCha20)* - Completed
+- [ ] *Phase 2: Global Threat Intelligence Grid* - In Progress
+    - Implementing gRPC-based telemetry for real-time threat synchronization across server fleets.
+- [ ] *Phase 3: AI-Driven Self-Healing*
+    - Integrating in-memory lightweight neural networks to predict and prevent zero-day attacks before execution.
+- [ ] *Phase 4: Quantum-Resistant Security*
+    - Transitioning to Post-Quantum Cryptography (PQC) standards for future-proof data integrity.
+- [ ] *Phase 5: Hardware-Level Integration*
+    - Direct SmartNIC firmware implementation for zero-latency, hardware-gate security.
+
+Built by Nikhil Sharma. Driven by the mission to secure the future of global infrastructure.
 A ultra-high-performance, kernel-style hybrid log parser built using *Rust* and *C++* via *FFI (Foreign Function Interface)*. This tool leverages Rust's fearless concurrency and multi-threading architecture alongside C++'s blazing-fast string-view manipulation to detect cyber threats in server logs within nanoseconds.
 High Performance: Rust + C++ Hybrid Engine (Blazing fast, memory safe).
 ​AI Mutation Core: Threat detection beyond hardcoded rules.
